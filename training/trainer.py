@@ -821,10 +821,33 @@ class Trainer:
 
 
 def chunk_batch_for_accum_steps(batch: Mapping, accum_steps: int) -> List[Mapping]:
-    """Splits a batch into smaller chunks for gradient accumulation."""
+    """Splits a batch into smaller chunks for gradient accumulation.
+
+    If the batch size is smaller than accum_steps, the number of chunks
+    is capped at the batch size to avoid empty chunks that would crash
+    the model (e.g., "batch size must be positive" in attention).
+    """
     if accum_steps == 1:
         return [batch]
-    return [get_chunk_from_data(batch, i, accum_steps) for i in range(accum_steps)]
+
+    # Determine the minimum batch dimension across all tensors in the batch
+    batch_size = _get_min_batch_size(batch)
+    effective_steps = min(accum_steps, batch_size) if batch_size > 0 else accum_steps
+
+    return [get_chunk_from_data(batch, i, effective_steps) for i in range(effective_steps)]
+
+
+def _get_min_batch_size(data: Any) -> int:
+    """Recursively find the minimum batch dimension from tensors in the batch dict."""
+    if isinstance(data, torch.Tensor):
+        return data.shape[0] if data.ndim > 0 else 1
+    elif isinstance(data, Mapping):
+        sizes = [_get_min_batch_size(v) for v in data.values() if _get_min_batch_size(v) > 0]
+        return min(sizes) if sizes else 1
+    elif isinstance(data, (list, tuple)) and not isinstance(data, str):
+        sizes = [_get_min_batch_size(v) for v in data if _get_min_batch_size(v) > 0]
+        return min(sizes) if sizes else 1
+    return 1  # non-tensor data (strings, scalars) — don't constrain
 
 def is_sequence_of_primitives(data: Any) -> bool:
     """Checks if data is a sequence of primitive types (str, int, float, bool)."""

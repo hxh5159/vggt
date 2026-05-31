@@ -142,6 +142,7 @@ def generate_exp_config(exp_name, exp_def, co3d_dir, anno_dir, ckpt_path, output
                     "dataset_configs": [{
                         "_target_": "data.datasets.co3d.Co3dDataset",
                         "split": "train",
+                        "min_num_images": 2,  # 适配小数据集
                         "CO3D_DIR": co3d_dir,
                         "CO3D_ANNOTATION_DIR": anno_dir,
                     }],
@@ -161,6 +162,7 @@ def generate_exp_config(exp_name, exp_def, co3d_dir, anno_dir, ckpt_path, output
                     "dataset_configs": [{
                         "_target_": "data.datasets.co3d.Co3dDataset",
                         "split": "test",
+                        "min_num_images": 2,  # 适配小数据集
                         "CO3D_DIR": co3d_dir,
                         "CO3D_ANNOTATION_DIR": anno_dir,
                     }],

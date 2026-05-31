@@ -19,7 +19,7 @@ exp_name: ablation_full
 img_size: 518
 num_workers: 4
 seed_value: 42
-accum_steps: 4
+accum_steps: 4          # 梯度累积（chunk_batch会自动适配小batch避免空chunk）
 patch_size: 14
 val_epoch_freq: 5
 max_img_per_gpu: 24
@@ -42,6 +42,7 @@ data:
       dataset_configs:
         - _target_: data.datasets.co3d.Co3dDataset
           split: train
+          min_num_images: 2    # 降低限制，适配小数据集
           CO3D_DIR: /YOUR/PATH/TO/CO3D
           CO3D_ANNOTATION_DIR: /YOUR/PATH/TO/CO3D_ANNOTATION
   val:
@@ -57,6 +58,7 @@ data:
       dataset_configs:
         - _target_: data.datasets.co3d.Co3dDataset
           split: test
+          min_num_images: 2    # 降低限制，适配小数据集
           CO3D_DIR: /YOUR/PATH/TO/CO3D
           CO3D_ANNOTATION_DIR: /YOUR/PATH/TO/CO3D_ANNOTATION
 
