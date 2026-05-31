@@ -92,11 +92,27 @@ ABLATION_EXPERIMENTS = {
 }
 
 
-def generate_exp_config(exp_name, exp_def, co3d_dir, anno_dir, ckpt_path, output_dir):
+def generate_exp_config(exp_name, exp_def, co3d_dir, anno_dir, ckpt_path, output_dir, config_name=None):
     """
     Generate a Hydra config file for a specific ablation experiment.
+
+    Args:
+        exp_name: Experiment name for logging directory
+        exp_def: Experiment definition dict
+        co3d_dir: Path to Co3D dataset
+        anno_dir: Path to Co3D annotations
+        ckpt_path: Path to pre-trained checkpoint
+        output_dir: Root output directory for logs/ckpts
+        config_name: Config file name (without .yaml). Written to training/config/.
+                     If None, uses exp_name.
+
+    Returns:
+        The config file name (without path)
     """
     import yaml
+
+    if config_name is None:
+        config_name = exp_name
 
     config = {
         "defaults": ["default_dataset"],
@@ -242,14 +258,14 @@ def generate_exp_config(exp_name, exp_def, co3d_dir, anno_dir, ckpt_path, output
         },
     }
 
-    # Save config
-    config_dir = f"{output_dir}/{exp_name}/config"
+    # Save config to training/config/ so launch.py can load it
+    config_dir = "training/config"
     os.makedirs(config_dir, exist_ok=True)
-    config_path = os.path.join(config_dir, "default.yaml")
+    config_path = os.path.join(config_dir, f"{config_name}.yaml")
     with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
 
-    return config_path
+    return config_name
 
 
 def run_full_finetune(args):
@@ -265,12 +281,13 @@ def run_full_finetune(args):
     check_hardware()
 
     # Run training with full finetune config
+    # launch.py uses --config <name> which loads training/config/<name>.yaml
     cmd = [
         "torchrun",
         "--nproc_per_node", str(args.nproc),
         "--master_port", str(args.master_port),
         "training/launch.py",
-        f"training/config/co3d_full_finetune.yaml",
+        "--config", "co3d_full_finetune",
     ]
 
     logger.info(f"Running: {' '.join(cmd)}")
@@ -296,20 +313,23 @@ def run_ablation_experiments(args):
 
         output_dir = args.output_dir or "logs/ablation"
 
-        config_path = generate_exp_config(
+        # Generate config into training/config/ so launch.py can find it
+        config_name = f"ablation_{exp_name}"
+        generate_exp_config(
             exp_name, exp_def,
             args.co3d_dir, args.anno_dir,
             args.checkpoint_path,
             output_dir,
+            config_name=config_name,
         )
 
+        # launch.py uses --config <name> to load training/config/<name>.yaml
         cmd = [
             "torchrun",
             "--nproc_per_node", str(args.nproc),
             "--master_port", str(args.master_port),
             "training/launch.py",
-            "--config-path", os.path.dirname(config_path),
-            "--config-name", "default",
+            "--config", config_name,
         ]
 
         logger.info(f"Running: {' '.join(cmd)}")

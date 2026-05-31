@@ -456,9 +456,9 @@ python run_experiments.py --mode ablation \
 #   resume_checkpoint_path: /your/path/to/pretrained.pt
 
 # Then run:
+# launch.py uses --config <name> to load training/config/<name>.yaml
 torchrun --nproc_per_node=1 training/launch.py \
-    --config-path training/config \
-    --config-name co3d_full_finetune
+    --config co3d_full_finetune
 ```
 
 ### 8.7 Step 4: Monitor Training
