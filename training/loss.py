@@ -87,6 +87,9 @@ def compute_camera_loss(
     weight_trans=1.0,       # weight for translation loss
     weight_rot=1.0,         # weight for rotation loss
     weight_focal=0.5,       # weight for focal length loss
+    skip_T=False,           # (Ablation) If True, skip translation loss
+    skip_R=False,           # (Ablation) If True, skip rotation loss
+    skip_FL=False,          # (Ablation) If True, skip focal length loss
     **kwargs
 ):
     # List of predicted pose encodings per stage
@@ -138,6 +141,14 @@ def compute_camera_loss(
     avg_loss_T = total_loss_T / n_stages
     avg_loss_R = total_loss_R / n_stages
     avg_loss_FL = total_loss_FL / n_stages
+
+    # Apply ablation skip flags
+    if skip_T:
+        avg_loss_T = avg_loss_T * 0
+    if skip_R:
+        avg_loss_R = avg_loss_R * 0
+    if skip_FL:
+        avg_loss_FL = avg_loss_FL * 0
 
     # Compute total weighted camera loss
     total_camera_loss = (
@@ -236,10 +247,11 @@ def compute_point_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
     return loss_dict
 
 
-def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_fn = None, valid_range=-1, **kwargs):
+def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_fn = None, valid_range=-1,
+                        skip_conf=False, skip_reg=False, skip_grad=False, **kwargs):
     """
     Compute depth loss.
-    
+
     Args:
         predictions: Dict containing 'depth' and 'depth_conf'
         batch: Dict containing ground truth 'depths' and 'point_masks'
@@ -247,6 +259,9 @@ def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
         alpha: Weight for confidence regularization
         gradient_loss_fn: Type of gradient loss to apply
         valid_range: Quantile range for outlier filtering
+        skip_conf: (Ablation) If True, skip confidence-weighted loss (loss_conf_depth=0)
+        skip_reg:  (Ablation) If True, skip L2 regression loss (loss_reg_depth=0)
+        skip_grad: (Ablation) If True, skip gradient smoothness loss (loss_grad_depth=0)
     """
     pred_depth = predictions['depth']
     pred_depth_conf = predictions['depth_conf']
@@ -264,14 +279,24 @@ def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
                     f"loss_grad_depth": dummy_loss,}
         return loss_dict
 
+    # Override gradient_loss_fn if skip_grad is set
+    if skip_grad:
+        gradient_loss_fn = None
+
     # NOTE: we put conf inside regression_loss so that we can also apply conf loss to the gradient loss in a multi-scale manner
     # this is hacky, but very easier to implement
     loss_conf, loss_grad, loss_reg = regression_loss(pred_depth, gt_depth, gt_depth_mask, conf=pred_depth_conf,
                                              gradient_loss_fn=gradient_loss_fn, gamma=gamma, alpha=alpha, valid_range=valid_range)
 
+    # Apply ablation skip flags
+    if skip_conf:
+        loss_conf = (0.0 * pred_depth).mean()
+    if skip_reg:
+        loss_reg = (0.0 * pred_depth).mean()
+
     loss_dict = {
         f"loss_conf_depth": loss_conf,
-        f"loss_reg_depth": loss_reg,    
+        f"loss_reg_depth": loss_reg,
         f"loss_grad_depth": loss_grad,
     }
 
